@@ -10,13 +10,12 @@ from sqlalchemy import create_engine
 import pandas as pd
 import time
 from selenium.webdriver.common.keys import Keys
+import json
+
 
 class YoutubeSearch:
 
-    
-
     def __init__(self, driver_url, headless):
-
         self.keywords = ''
         self.min_subscribers_filter = -1
         self.max_subscribers_filter = -1
@@ -37,37 +36,25 @@ class YoutubeSearch:
         self.driver = webdriver.Chrome(driver_url, options=self.options)
 
 
-
-
-    # login
-
-    # set filters
-
-    # export
-    # 
-
     # run
     def run(self, keywords):
         self.driver.get('https://www.youtube.com/')
         self.driver.maximize_window()
         self.keywords = keywords
-        print('step1')
+        
         time.sleep(5)
         search_box =self.driver.find_elements(By.TAG_NAME, "input")      
         search_box[0].send_keys(keywords)
         search_box[0].send_keys(Keys.ENTER)
-
-        print('step2')
+        
         time.sleep(5)
         search_box =self.driver.find_element(By.XPATH, "/html/body/ytd-app/div[1]/ytd-page-manager/ytd-search/div[1]/ytd-two-column-search-results-renderer/div/ytd-section-list-renderer/div[1]/div[2]/ytd-search-sub-menu-renderer/div[1]/div/ytd-toggle-button-renderer/yt-button-shape/button")      
         search_box.click()
-
-        print('step3')
+        
         time.sleep(1)
         channel_search_mode =self.driver.find_element(By.XPATH, "/html/body/ytd-app/div[1]/ytd-page-manager/ytd-search/div[1]/ytd-two-column-search-results-renderer/div/ytd-section-list-renderer/div[1]/div[2]/ytd-search-sub-menu-renderer/div[1]/iron-collapse/div/ytd-search-filter-group-renderer[2]/ytd-search-filter-renderer[2]/a")      
         channel_search_mode.click()
-
-        print('step4')
+        
         time.sleep(3)
         channel_list_counter = 1
         resulting_channels = []
@@ -99,66 +86,95 @@ class YoutubeSearch:
                     self.driver.switch_to.window(self.driver.window_handles[1])
                     self.driver.get(channel_link)
                     
-                    # about tab
-                    WebDriverWait(self.driver, 20).until(EC.element_to_be_clickable((By.XPATH,"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/div[3]/ytd-c4-tabbed-header-renderer/tp-yt-app-header-layout/div/tp-yt-app-header/div[2]/tp-yt-app-toolbar/div/div/tp-yt-paper-tabs/div/div/tp-yt-paper-tab[6]"))).click()
+                    try:
+                        # about tab
+                        final_tab = len(self.driver.find_elements(By.XPATH,"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/div[3]/ytd-c4-tabbed-header-renderer/tp-yt-app-header-layout/div/tp-yt-app-header/div[2]/tp-yt-app-toolbar/div/div/tp-yt-paper-tabs/div/div/tp-yt-paper-tab"))
+                        about_page = WebDriverWait(self.driver, 20).until(EC.element_to_be_clickable((By.XPATH,f"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/div[3]/ytd-c4-tabbed-header-renderer/tp-yt-app-header-layout/div/tp-yt-app-header/div[2]/tp-yt-app-toolbar/div/div/tp-yt-paper-tabs/div/div/tp-yt-paper-tab[{final_tab-1}]")))
+                        while("about" not in about_page.text.lower()):
+                            about_page = WebDriverWait(self.driver, 20).until(EC.element_to_be_clickable((By.XPATH,f"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/div[3]/ytd-c4-tabbed-header-renderer/tp-yt-app-header-layout/div/tp-yt-app-header/div[2]/tp-yt-app-toolbar/div/div/tp-yt-paper-tabs/div/div/tp-yt-paper-tab[{final_tab}]")))
+                        
+                        about_page.click()
+                        time.sleep(3)                    
+                        joined_date = self.driver.find_element(By.ID,"right-column").find_elements(By.TAG_NAME,"span")[1].text
+                        views = self.driver.find_element(By.XPATH,"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-channel-about-metadata-renderer/div[2]/yt-formatted-string[3]").text
+                        if(' ' in views):
+                            views = views.split(" ")[0]
+                        if(',' in views):
+                            views = views.replace(',','')
+                            views = int(views)
+                            
+                        full_description = self.driver.find_element(By.XPATH,"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-channel-about-metadata-renderer/div[1]/div[1]/yt-formatted-string[2]").text                      
+                        location = self.driver.find_element(By.XPATH,"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-channel-about-metadata-renderer/div[1]/div[4]/table/tbody/tr[2]/td[2]/yt-formatted-string").text   
+                        link_titles = self.driver.find_element(By.XPATH,'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-channel-about-metadata-renderer/div[1]/div[5]/div').find_elements(By.CSS_SELECTOR, "a.yt-simple-endpoint")
+                        links = []
+                        for c in range(len(link_titles)):         
+                            if(len(link_titles[c].text)>1):            
+                                links.append({link_titles[c].text:link_titles[c].get_attribute("href")})     
+                                                
+                        average_views = 0   
+                        avg_counter = 0  
 
-                    joined_date = self.driver.find_element(By.XPATH,"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-channel-about-metadata-renderer/div[2]/yt-formatted-string[2]/span[2]").text
-                    views = self.driver.find_element(By.XPATH,"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-channel-about-metadata-renderer/div[2]/yt-formatted-string[3]").text
-                    if(' ' in views):
-                        views = views.split(" ")
-                    if(',' in views):
-                        views = views.replace(',','')
-                        views = int(views)
+                        # videos tab
+                        WebDriverWait(self.driver, 20).until(EC.element_to_be_clickable((By.XPATH,"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/div[3]/ytd-c4-tabbed-header-renderer/tp-yt-app-header-layout/div/tp-yt-app-header/div[2]/tp-yt-app-toolbar/div/div/tp-yt-paper-tabs/div/div/tp-yt-paper-tab[2]"))).click()
 
-                    full_description = self.driver.find_element(By.XPATH,'//*[@id="description"]').text                             
-                    location = self.driver.find_element(By.XPATH,'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-channel-about-metadata-renderer/div[1]/div[4]/table/tbody/tr[2]/td[2]/yt-formatted-string').text   
-                    link_titles = self.driver.find_element(By.XPATH,'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-channel-about-metadata-renderer/div[1]/div[5]/div/a[2]/yt-formatted-string').find_elements(By.ID,'a')
-                    links = []
-                    for c in range(len(link_titles)):         
-                        if(len(link_titles[c].text)>1):            
-                            links.append({link_titles[c].text:link_titles[c].get_attribute("href")})     
-                                        
-                    average_views = 0   
-                    avg_counter = 0  
+                        time.sleep(2)
 
-                    # videos tab
-                    WebDriverWait(self.driver, 20).until(EC.element_to_be_clickable((By.XPATH,"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/div[3]/ytd-c4-tabbed-header-renderer/tp-yt-app-header-layout/div/tp-yt-app-header/div[2]/tp-yt-app-toolbar/div/div/tp-yt-paper-tabs/div/div/tp-yt-paper-tab[2]"))).click()
+                        # scroll till end
+                        while True:
+                            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                            time.sleep(2)
+                                
+                            end_of_page = self.driver.execute_script(
+                                "return (window.innerHeight + window.pageYOffset) >= document.body.offsetHeight;"
+                            )
 
-                    time.sleep(2)
-                    self.driver.execute_script("window.scrollTo(0, 0)")                      
-                    rec_rows_count = len(self.driver.find_elements(By.XPATH,'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-rich-grid-renderer/div[6]/ytd-rich-grid-row'))
-                    for r in range(rec_rows_count):
-                        rr = r+1
-                        col_count = len(self.driver.find_elements(By.XPATH,f'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-rich-grid-renderer/div[6]/ytd-rich-grid-row[{rr}]/div/ytd-rich-item-renderer'))
-                        for c in range(col_count):
-                            cc = c +1
-                            view_label = self.driver.find_element(By.XPATH,f'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-rich-grid-renderer/div[6]/ytd-rich-grid-row[{rr}]/div/ytd-rich-item-renderer[{cc}]/div/ytd-rich-grid-media/div[1]/div[2]/div[1]/ytd-video-meta-block/div[1]/div[2]/span[1]').text.split(' ')[0]
-                            view_label = view_label.replace('.','')
-                            view_num = 0
-                            if('G' in view_label):
-                                view_num = int(view_label[0:len(view_label)-1]) * 1000000000
-                            elif('M' in view_label):
-                                view_num = int(view_label[0:len(view_label)-1]) * 1000000
-                            elif('K' in view_label):
-                                view_num = int(view_label[0:len(view_label)-1]) * 1000
-                            else:
-                                view_num = int(view_label)
-                            avg_counter+=1
-                            average_views += view_num
-                    average_views = float(average_views/avg_counter)
-                    temp = {{"channel name":channel_name},{"subscriber":subscriber},{"avatar":channel_avatar},{"link":channel_link},{"description":full_description},{"joined date":joined_date},{"views":views},{"location":location},{"links":links},{"average view":average_views}}
-                    resulting_channels.append(temp)                                                                     
+                            if end_of_page:
+                                break
+
+                        rec_rows_count = len(self.driver.find_elements(By.XPATH,'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-rich-grid-renderer/div[6]/ytd-rich-grid-row'))
+                        for r in range(rec_rows_count):
+                            col_count = len(self.driver.find_elements(By.XPATH,f'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-rich-grid-renderer/div[6]/ytd-rich-grid-row[{r+1}]/div/ytd-rich-item-renderer'))
+                            for c in range(col_count):
+                                view_label = self.driver.find_element(By.XPATH,f'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-rich-grid-renderer/div[6]/ytd-rich-grid-row[{r+1}]/div/ytd-rich-item-renderer[{c+1}]/div/ytd-rich-grid-media/div[1]/div[2]/div[1]/ytd-video-meta-block/div[1]/div[2]/span[1]').text.split(' ')[0]
+                                view_label = view_label.replace('.','')
+                                view_num = 0
+                                if('G' in view_label):
+                                    view_num = int(view_label[0:len(view_label)-1]) * 1000000000
+                                elif('M' in view_label):
+                                    view_num = int(view_label[0:len(view_label)-1]) * 1000000
+                                elif('K' in view_label):
+                                    view_num = int(view_label[0:len(view_label)-1]) * 1000
+                                else:
+                                    view_num = int(view_label)
+                                avg_counter+=1
+                                average_views += view_num
+                        average_views = int(average_views/avg_counter)
+                        temp = {"channel name":channel_name,"subscriber":subscriber,"avatar":channel_avatar,"link":channel_link,"description":full_description,"joined date":joined_date,"views":views,"location":location,"links":links,"average view":average_views}
+                        resulting_channels.append(temp)         
+                    except:
+                        print("ignored!")                                                                                
                     self.driver.close()
-
-                
-            self.driver.switch_to.window(self.driver.window_handles[0])
-            time.sleep(2)
+                    self.driver.switch_to.window(self.driver.window_handles[0])
+                channel_list_counter += 1 
+                if(len(resulting_channels)>=self.result_record_count):
+                    break
+            
+            if(len(resulting_channels)>=self.result_record_count):
+                break    
+                                
             self.driver.execute_script("window.scrollTo(0, 0)")  
-            channel_list_counter += 1 
-            if(resulting_channels>=self.result_record_count):
-                break
+            time.sleep(2)
+            
+        json_data = json.dumps(resulting_channels)            
+        try:
+            json.loads(json_data)
+            print("Valid JSON data")
+        except ValueError as e:
+            print("Invalid JSON data:", e)
 
-        print('end')
+        # write the JSON data to a file
+        with open('data.json', 'w') as f:
+            f.write(json_data)
 
         
 
@@ -169,10 +185,10 @@ class YoutubeSearch:
 
 
 youtube = YoutubeSearch('C:\Apps\chrome_110\chromedriver.exe',False)
-youtube.result_record_count = 8
+youtube.result_record_count = 5
 youtube.min_subscribers_filter = 1000
 youtube.max_subscribers_filter = 2000000
 
-youtube.run('Germany')
+youtube.run('USA')
 
     
