@@ -235,15 +235,16 @@ class YoutubeSearch:
         except ValueError as e:
             print("Invalid JSON data:", e)
 
-        # return json_data 
-        self.driver.close()
+        return json_data 
+        # self.driver.close()
            
 
-        with open('data.json', 'w') as f:
-            f.write(json_data)
+        # with open('data.json', 'w') as f:
+        #     f.write(json_data)
 
     
-youtube = YoutubeSearch('C:\Apps\chrome_110\chromedriver.exe',False)
+# youtube = YoutubeSearch('C:\Apps\chrome_110\chromedriver.exe',False)
     
-youtube.result_record_count = 22
-youtube.run('erotic Comics Show')
+# youtube.result_record_count = 5
+# youtube.slot = 1
+# youtube.run('erotic Comics Show')
